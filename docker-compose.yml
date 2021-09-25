@@ -1,0 +1,41 @@
+version: "3.7"
+services:
+  web:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+     - "5001:5001"
+    depends_on:
+      - redis
+  worker:
+    build:
+      context: ./celery-queue
+      dockerfile: Dockerfile
+    entrypoint: celery
+    command: -A tasks worker -l info -E
+    environment:
+      CELERY_BROKER_URL: redis://redis
+      CELERY_RESULT_BACKEND: redis://redis
+    depends_on:
+      - redis
+    volumes: ['./celery-queue:/queue']
+  monitor:
+    build:
+      context: ./celery-queue
+      dockerfile: Dockerfile
+    ports:
+     - "5555:5555"
+    command:  ['celery', 'flower', '-A', 'tasks']
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      - redis
+      - worker
+    volumes: ['./celery-queue:/queue']
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
